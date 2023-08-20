@@ -128,7 +128,6 @@ class SioElement extends HTMLElement {
         newValue = propData.type( newValue )
       }
       this[ `${ prop }` ] = newValue
-      // console.log( "attributeChangedCallback", prop, oldValue, newValue, this )
       this.propertyChangedCallback( prop, oldValue, newValue )
     }
   }
