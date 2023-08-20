@@ -3,6 +3,11 @@
   "version": "1.0.3",
   "description": "SioElement",
   "main": "SioElement.js",
+  "git": {
+    "url": "https://github.com/Siorbita/SioElement",
+    "author": "SIOrbita",
+    "email": "empirreamm@gmail.com"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
