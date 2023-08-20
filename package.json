@@ -1,0 +1,22 @@
+{
+  "name": "sioelement",
+  "version": "1.0.3",
+  "description": "SioElement",
+  "main": "SioElement.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "exports": {
+    ".": "./SioElement.js",
+    "./express": "./express.js"
+  },
+  "keywords": [
+    "SioElement",
+    "html",
+    "custom",
+    "elements"
+  ],
+  "author": "SIOrbita",
+  "license": "ISC",
+  "type": "module"
+}
