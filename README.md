@@ -17,8 +17,9 @@ npm install sioelement
 If you are using express, add the route /sio/SioElement.js the express middleware:
 
 ```javascript
-import app from 'express'
+import express from 'express'
 import sioElement from 'SioElement/express'
+const app = express()
 sioElement(app)
 ```
 
@@ -30,6 +31,15 @@ app.get('/sio/SioElement.js', sioElement)
 ```
 
 Then, import sio/SioElement.js in your custom element class:
+
+```javascript
+/* MyElement.js */
+import SioElement from '/sio/SioElement.js'
+
+class MyElement extends SioElement {
+    // ...
+}
+```
 
 
 

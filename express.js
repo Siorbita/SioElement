@@ -9,10 +9,10 @@ export default (app, options={})=>{
       res.sendFile(path.join(__dirname, 'SioElement.js'));
     }
   )
-  if(options.sioLoadiing){
-    app.use("/sio/sio-loading.js",
+  for(let sioElement of options.sioElements){
+    app.use(`/sio/${sioElement}.js`,
       (req,res)=>{
-        res.sendFile(path.join(__dirname,'sioElements', 'sio-loading.js'));
+        res.sendFile(path.join(__dirname,'sioElements', `${sioElement}.js`));
       }
     )
   }

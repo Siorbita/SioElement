@@ -1,6 +1,6 @@
 {
   "name": "sioelement",
-  "version": "1.0.5",
+  "version": "1.0.8",
   "description": "SioElement",
   "main": "SioElement.js",
   "git": {
@@ -23,5 +23,6 @@
   ],
   "author": "SIOrbita",
   "license": "ISC",
-  "type": "module"
+  "type": "module",
+  "repository": "Siorbita/SioElement"
 }
