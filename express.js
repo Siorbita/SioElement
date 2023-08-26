@@ -9,6 +9,9 @@ export default (app, options={})=>{
       res.sendFile(path.join(__dirname, 'SioElement.js'));
     }
   )
+  if(!options.sioElements || !Array.isArray(options.sioElements)){
+    options.sioElements = [];
+  }
   for(let sioElement of options.sioElements){
     app.use(`/sio/${sioElement}.js`,
       (req,res)=>{
