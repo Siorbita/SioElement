@@ -89,6 +89,8 @@ SioElement provides several lifecycle hooks for customization:
 - connectedCallback(): Called when the component is added to the DOM.
 - render(): Called to render the component. It must return a this.html`` template literal. The content of the template literal is rendered using Lit HTML.
 
+
+
 ## Properties
 
 SioElement provides a set of features to simplify the process of building and managing web components with attributes, properties, rendering, and lifecycle events.

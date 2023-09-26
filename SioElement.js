@@ -1,5 +1,16 @@
-import { html, unsafeHTML, render, classMap, styleMap, Directive, directive, AsyncDirective } from "https://cdn.jsdelivr.net/gh/lit/dist@2/all/lit-all.min.js"
+import { html, unsafeHTML, render, classMap, styleMap, Directive, directive, AsyncDirective } from "./lithtml.js"
+import magicTrap from "./magicTrap.js"
 
+const snakeToCamel=(str)=> {
+  return str.toLowerCase().replace(/-([a-z])/g, function(match, letter) {
+    return letter.toUpperCase();
+  });
+}
+const camelToSnake=(str)=> {
+  return str.replace(/([A-Z])/g, function(match, letter) {
+    return '-' + letter.toLowerCase();
+  }).toLowerCase();
+}
 class SioElement extends HTMLElement {
   static define ( name ) {
     if ( !name ) {
@@ -14,7 +25,7 @@ class SioElement extends HTMLElement {
     let list = []
     for ( let prop in this.properties ) {
       if ( this.properties[ prop ].attribute ) {
-        list.push( prop.toLowerCase() )
+        list.push( camelToSnake(prop) )
       }
     }
     return list
@@ -31,26 +42,14 @@ class SioElement extends HTMLElement {
     this.classMap = classMap
     this.styleMap = styleMap
     this.root = this
-    for ( let prop in this.constructor.properties ) {
-      const already = this[ prop ] || null
-      const def = this.constructor.properties[ prop ].default || null
-      const isAttribute = this.constructor.properties[ prop ].attribute
-      if ( already ) {
-        this[ `_${ prop }` ] = this[ prop ]
-      } else if ( def ) {
-        this[ `_${ prop }` ] = this.constructor.properties[ prop ].default
-      } else {
-        this[ `_${ prop }` ] = false
-      }
-      if ( isAttribute ) {
-        if ( this[ `_${ prop }` ] ) {
-          this.setAttribute( prop, this[ `_${ prop }` ] )
-        } else {
-          this.removeAttribute( prop )
-        }
-      }
-      this.propertyChangedCallback( prop, null, this[ `_${ prop }` ] )
-    }
+    this.props=magicTrap({})
+    this.props.__onChange__(this,(prop,prev,value)=>{
+      this.propertyChangedCallback(prop,prev,value)
+    })
+    this.reactives = magicTrap({})
+    this.reactives.__onChange__(this,(prop,prev,value)=>{
+      this.requestUpdate()
+    })
     this.__styleElement = document.createElement( "style" )
     this.__styleElement.innerHTML = `
       ${ this.constructor.styles || '' }
@@ -61,30 +60,57 @@ class SioElement extends HTMLElement {
         pointer-events:none;
       }
     `
-    for ( let key in this.constructor.properties ) {
-      const prop= this.constructor.properties[ key ]
-      Object.defineProperty( this, key, {
-        get: () => this[ `_${ key }` ],
+    this.startProps()
+    this.updateDebounce = null
+  }
+  propertyToAttribute ( name ) {
+    const attributeName=camelToSnake(name)
+    const propInfo=this.constructor.properties[ name ]
+    if(this[ name ]==undefined) {
+      this.removeAttribute( attributeName )
+      return
+    }
+    if(propInfo.type==Boolean){
+      if(this[ name ]){
+        this.setAttribute( attributeName, "" )
+      }else{
+        this.removeAttribute( attributeName )
+      }
+      return
+    }
+    if ( this.constructor.properties[ name ].attribute ) {
+      this.setAttribute( attributeName, this[ name ].toString() )
+    }
+  }
+  startProps(){
+    for ( let prop in this.constructor.properties ) {
+      const propInfo = this.constructor.properties[ prop ]
+      Object.defineProperty( this, prop, {
+        get: () => this.props[prop],
         set: ( value ) => {
-          const prev = this[ `_${ key }` ]
-          if(prop.type && typeof prop.type == "function"){
-            value = prop.type( value )
+          const prev = this.props[prop]
+          if(prev==value) return
+          if(!propInfo.type){
+            propInfo.type=(value)=>value
+          }
+          if(propInfo.type && typeof propInfo.type == "function"){
+            try{
+              value = propInfo.type( value )
+            }catch(e){
+              console.error(e)
+              return
+            }
           }
           if ( prev !== value ) {
-            this[ `_${ key }` ] = value
-            if ( prop.attribute ) {
-              if ( value ) {
-                this.setAttribute( key, value )
-              } else {
-                this.removeAttribute( key )
-              }
-            }
-            this.propertyChangedCallback( key, prev, value )
+            this.props[prop] = value
+          }
+          if([String,Number,Boolean].includes(propInfo.type)){
+            this.propertyToAttribute( prop )
           }
         }
       } )
+      this.props[prop]=propInfo.default
     }
-    this.updateDebounce = null
   }
   propertyChangedCallback ( name, oldValue, newValue ) {
     if ( oldValue !== newValue ) {
@@ -95,41 +121,26 @@ class SioElement extends HTMLElement {
     if ( !this.constructor.notShadowed ) {
       this.root = this.attachShadow( { mode: "open" } )
     }
-    let attributes = this.constructor.observedAttributes
-    for ( let attribute of attributes ) {
-      let prop = Object.keys( this.constructor.properties ).find( prop => prop.toLowerCase() == attribute.toLowerCase() )
-      const propData= this.constructor.properties[ prop ]
-      if ( this.hasAttribute( attribute ) ) {
-        if ( !this.getAttribute( attribute ) && propData.type == Boolean ) {
-          this[ `_${ prop }` ] = true
-        } else {
-          this[ `_${ prop }` ] = this.getAttribute( attribute )
-        }
-      }
-    }
     this.emit( "connected" )
     this.requestUpdate()
   }
   attributeChangedCallback ( name, oldValue, newValue ) {
-    if ( newValue == "" ) {
-      newValue = true
-    }
-    if ( oldValue !== newValue ) {
-      let prop = Object.keys( this.constructor.properties ).find( prop => prop.toLowerCase() == name.toLowerCase() )
-      const propData= this.constructor.properties[ prop ]
-      if(propData.type && typeof propData.type == "function"){
-        if(propData.type == Boolean){
-          if([false,"false","0",0,"no","n","off","disabled","undefined","null","NaN",""].includes(newValue)){
-            newValue = false
-          }else{
-            newValue = true
-          }
+    if(oldValue==newValue) return
+    
+    const propName=snakeToCamel(name)
+    let prop = Object.keys( this.constructor.properties ).find( prop => prop.toLowerCase() == propName.toLowerCase() )
+    const propData= this.constructor.properties[ propName ]
+    if(propData.type==Boolean){
+      if(this.hasAttribute(name)){
+        newValue=true
+        if(this.hasAttribute(name)=="false"){
+          newValue=false
         }
-        newValue = propData.type( newValue )
+      }else{
+        newValue=false
       }
-      this[ `${ prop }` ] = newValue
-      this.propertyChangedCallback( prop, oldValue, newValue )
     }
+    this[prop]=newValue
   }
   __drawToParent ( content, parent ) {
     return render( content, parent )
