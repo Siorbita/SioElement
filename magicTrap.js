@@ -5,7 +5,13 @@ const defaultOptions = {
 const magicTrap = (obj, userOptions = {}) => {
   if(typeof obj !== "object" || obj === null) throw new Error("magicTrap only accepts objects");
   const options = Object.assign({}, defaultOptions, userOptions);
-  const trapTarget=structuredClone(obj);
+  let trapTarget;
+  try{
+     trapTarget=structuredClone(obj);
+  }catch(e){
+    console.error(e)
+    trapTarget=JSON.parse(JSON.stringify(obj))
+  }
   
   // Define properties without restrictive flags
   Object.defineProperty(trapTarget, "__original__", { value: obj });
