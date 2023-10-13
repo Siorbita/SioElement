@@ -32,6 +32,9 @@ const magicTrap = (obj, userOptions = {}) => {
 
   const prox = new Proxy(trapTarget, {
     get(target, prop) {
+      if(typeof prop!=="string") {
+        return target[prop];
+      }
       if (prop.startsWith("__") && prop.endsWith("__")) {
         return target[prop];
       }
@@ -45,6 +48,10 @@ const magicTrap = (obj, userOptions = {}) => {
       return target[prop];
     },
     set(target, prop, value) {
+      if(typeof prop!=="string") {
+        target[prop] = value;
+        return true;
+      }
       if (prop.startsWith("__") && prop.endsWith("__")) {
         target[prop] = value;
         return true;
