@@ -1,199 +1,210 @@
-import { html, unsafeHTML, render, classMap, styleMap, Directive, directive, AsyncDirective } from "./lithtml.js"
-import magicTrap from "./magicTrap.js"
+import { html, render } from "lit-html"
+import { classMap } from "lit-html/directives/class-map.js"
+import { styleMap } from "lit-html/directives/style-map.js"
+import { unsafeHTML } from "lit-html/directives/unsafe-html.js"
 
-const snakeToCamel=(str)=> {
-  return str.toLowerCase().replace(/-([a-z])/g, function(match, letter) {
-    return letter.toUpperCase();
-  });
-}
-const camelToSnake=(str)=> {
-  return str.replace(/([A-Z])/g, function(match, letter) {
-    return '-' + letter.toLowerCase();
-  }).toLowerCase();
-}
 class SioElement extends HTMLElement {
-  static define ( name ) {
-    if ( !name ) {
+  static define(name) {
+    if (!name) {
       name = this.name
     }
-    name = name.replace( /^[A-Z]/, letter => letter.toLowerCase() ).replace( /[A-Z]/g, letter => `-${ letter.toLowerCase() }` )
-    if ( !customElements.get( name ) ) {
-      customElements.define( name, this )
+    name = name
+      .replace(/^[A-Z]/, (letter) => letter.toLowerCase())
+      .replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)
+    if (!customElements.get(name)) {
+      customElements.define(name, this)
     }
   }
-  static get observedAttributes () {
-    let list = []
-    for ( let prop in this.properties ) {
-      if ( this.properties[ prop ].attribute ) {
-        list.push( camelToSnake(prop) )
+
+  static get observedAttributes() {
+    const list = []
+    for (let prop in this.properties) {
+      if (this.properties[prop].attribute) {
+        list.push(prop.toLowerCase())
       }
     }
     return list
   }
-  static get properties () {
+
+  static get properties() {
     return {}
   }
-  __styleElement = null
-  __updates = 0
-  constructor () {
+
+  __styleElement = null;
+  __updates = 0;
+  __renders = 0;
+
+  constructor() {
     super()
     this.html = html
     this.unsafeHTML = unsafeHTML
     this.classMap = classMap
     this.styleMap = styleMap
     this.root = this
-    this.props=magicTrap({})
-    this.props.__onChange__(this,(prop,prev,value)=>{
-      this.propertyChangedCallback(prop,prev,value)
-    })
-    this.reactives = magicTrap({})
-    this.reactives.__onChange__(this,(prop,prev,value)=>{
-      this.requestUpdate()
-    })
-    this.__styleElement = document.createElement( "style" )
+    this.initializeProperties()
+    this.__styleElement = document.createElement("style")
     this.__styleElement.innerHTML = `
-      ${ this.constructor.styles || '' }
-      :host([hidden]){
-        display:none;
+      ${this.constructor.styles || ''}
+      :host([hidden]) {
+        display: none;
       }
-      :host([disabled]){
-        pointer-events:none;
+      :host([disabled]) {
+        pointer-events: none;
       }
     `
-    this.startProps()
     this.updateDebounce = null
   }
-  propertyToAttribute ( name ) {
-    const attributeName=camelToSnake(name)
-    const propInfo=this.constructor.properties[ name ]
-    if(this[ name ]==undefined) {
-      this.removeAttribute( attributeName )
-      return
-    }
-    if(propInfo.type==Boolean){
-      if(this[ name ]){
-        this.setAttribute( attributeName, "" )
-      }else{
-        this.removeAttribute( attributeName )
+
+  initializeProperties() {
+    const properties = this.constructor.properties
+    for (let prop in properties) {
+      const def = properties[prop].default || null
+      this[`_${prop}`] = this[prop] || def || false
+      if (properties[prop].attribute) {
+        this.updateAttribute(prop)
       }
-      return
-    }
-    if ( this.constructor.properties[ name ].attribute ) {
-      this.setAttribute( attributeName, this[ name ].toString() )
     }
   }
-  startProps(){
-    for ( let prop in this.constructor.properties ) {
-      const propInfo = this.constructor.properties[ prop ]
-      Object.defineProperty( this, prop, {
-        get: () => this.props[prop],
-        set: ( value ) => {
-          const prev = this.props[prop]
-          if(prev==value) return
-          if(!propInfo.type){
-            propInfo.type=(value)=>value
-          }
-          if(propInfo.type && typeof propInfo.type == "function"){
-            try{
-              value = propInfo.type( value )
-            }catch(e){
-              console.error(e)
-              return
-            }
-          }
-          if ( prev !== value ) {
-            this.props[prop] = value
-          }
-          if([String,Number,Boolean].includes(propInfo.type)){
-            this.propertyToAttribute( prop )
-          }
-        }
-      } )
-      this.props[prop]=propInfo.default
+
+  updateAttribute(prop) {
+    if (this[`_${prop}`]) {
+      this.setAttribute(prop, this[`_${prop}`])
+    } else {
+      this.removeAttribute(prop)
     }
+    this.propertyChangedCallback(prop, null, this[`_${prop}`])
   }
-  propertyChangedCallback ( name, oldValue, newValue ) {
-    if ( oldValue !== newValue ) {
+
+  async propertyChangedCallback(name, oldValue, newValue) {
+    if (oldValue !== newValue) {
+      if (typeof this.propertyChanged === "function") {
+        await this.propertyChanged(name, oldValue, newValue)
+      }
       this.requestUpdate()
     }
   }
-  connectedCallback () {
-    if ( !this.constructor.notShadowed ) {
-      this.root = this.attachShadow( { mode: "open" } )
+
+  connectedCallback() {
+    // Attach Shadow DOM unless marked as notShadowed
+    const hasShadowRoot = !!this.shadowRoot
+    if (!this.constructor.notShadowed && !hasShadowRoot) {
+      this.root = this.attachShadow({ mode: "open" })
     }
-    this.emit( "connected" )
+    const attributes = this.constructor.observedAttributes
+    const propertiesKeys = Object.keys(this.constructor.properties)
+    for (const attribute of attributes) {
+      const prop = propertiesKeys.find((prop) => prop.toLowerCase() === attribute.toLowerCase())
+      const propData = this.constructor.properties[prop]
+      if (this.hasAttribute(attribute)) {
+        if (!this.getAttribute(attribute) && propData.type === Boolean) {
+          this[`_${prop}`] = true
+        } else {
+          this[`_${prop}`] = this.getAttribute(attribute)
+        }
+      }
+    }
+    this.emit("connected")
     this.requestUpdate()
   }
-  attributeChangedCallback ( name, oldValue, newValue ) {
-    if(oldValue==newValue) return
-    
-    const propName=snakeToCamel(name)
-    let prop = Object.keys( this.constructor.properties ).find( prop => prop.toLowerCase() == propName.toLowerCase() )
-    const propData= this.constructor.properties[ propName ]
-    if(propData.type==Boolean){
-      if(this.hasAttribute(name)){
-        newValue=true
-        if(this.hasAttribute(name)=="false"){
-          newValue=false
-        }
-      }else{
-        newValue=false
-      }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    const prop = Object.keys(this.constructor.properties).find(
+      (prop) => prop.toLowerCase() === name.toLowerCase()
+    )
+    const propData = this.constructor.properties[prop]
+    if (newValue === "" && propData.type === Boolean) {
+      newValue = true
     }
-    this[prop]=newValue
+    if (oldValue !== newValue) {
+      if (propData.type && typeof propData.type === "function") {
+        newValue = propData.type === Boolean ? parseBoolean(newValue) : propData.type(newValue)
+      }
+      this[`${prop}`] = newValue
+      this.propertyChangedCallback(prop, oldValue, newValue)
+    }
   }
-  __drawToParent ( content, parent ) {
-    return render( content, parent )
+
+  __drawToParent(content, parent) {
+    return render(content, parent)
   }
-  __drawContentToRoot ( content ) {
-    return this.__drawToParent( content, this.root )
+
+  __drawContentToRoot(content) {
+    return this.__drawToParent(content, this.root)
   }
-  emit ( name, data ) {
-    let event = new CustomEvent( name, { detail: data } )
-    this.dispatchEvent( event )
+
+  emit(name, data) {
+    const event = new CustomEvent(name, { detail: data })
+    this.dispatchEvent(event)
     return event
   }
-  hasChanged ( oldValue, newValue ) {
-    if ( oldValue !== newValue ) {
+
+  hasChanged(oldValue, newValue) {
+    if (oldValue !== newValue) {
       this.requestUpdate()
     }
   }
-  async requestUpdate () {
-    if ( this.updateDebounce ) {
-      clearTimeout( this.updateDebounce )
+
+  async requestUpdate() {
+    if (this.updateDebounce) {
+      clearTimeout(this.updateDebounce)
     }
-    this.updateDebounce = setTimeout( async () => {
-      this.emit( "updateRequested" )
+    this.updateDebounce = setTimeout(async () => {
+      this.emit("updateRequested")
       await this.__update()
-    }, 0 )
+    }, 0)
   }
-  async __update () {
-    if ( typeof this.update == "function" ) {
-      await this.update()
-    }
-    this.__render()
+
+  async __update() {
     this.__updates++
-    if ( this.__updates == 1 ) {
-      if ( typeof this.init == "function" ) {
+    if (this.__updates === 1) {
+      if (typeof this.init === "function") {
         await this.init()
       }
-      if ( typeof this.firstUpdated == "function" ) {
+    }
+    if (typeof this.update === "function") {
+      const res = await this.update()
+      if (res === false) {
+        return
+      }
+    }
+    if (this.__updates === 1) {
+      if (typeof this.firstUpdated === "function") {
         this.firstUpdated()
       }
-    } 
-    if ( typeof this.updated == "function" ) {
+    }
+    this.__render()
+
+    if (typeof this.updated === "function") {
       this.updated()
     }
-    this.emit( "updated" )
+    this.emit("updated")
   }
-  __render () {
-    let data = [ this.__styleElement ]
-    if ( typeof this.render == "function" ) {
-      data.push( this.render() )
+
+  __render() {
+    const data = [this.__styleElement]
+    if (typeof this.render === "function") {
+      data.push(this.render())
     }
-    this.__drawContentToRoot( data )
-    this.emit( "rendered" )
+    this.__drawContentToRoot(data)
+    this.__renders++
+    if (this.__renders === 1) {
+      if (typeof this.firstRender === "function") {
+        this.firstRender()
+      }
+    }
+    if (typeof this.rendered === "function") {
+      this.rendered()
+    }
+    if (typeof this.afterRender === "function") {
+      this.afterRender()
+    }
   }
 }
+
+// Helper function
+function parseBoolean(value) {
+  return ![false, "false", "0", 0, "no", "n", "off", "disabled", "undefined", "null", "NaN", ""].includes(value)
+}
+
 export default SioElement
-export { html, unsafeHTML, render, classMap, styleMap, Directive, directive, AsyncDirective }
+export { html, unsafeHTML, render, classMap, styleMap }

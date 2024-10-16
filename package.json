@@ -1,6 +1,6 @@
 {
   "name": "sioelement",
-  "version": "1.1.4",
+  "version": "2.0.1",
   "description": "SioElement",
   "main": "SioElement.js",
   "git": {
@@ -12,8 +12,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "exports": {
-    ".": "./SioElement.js",
-    "./express": "./express.js"
+    ".": "./SioElement.js"
   },
   "keywords": [
     "SioElement",
@@ -24,5 +23,8 @@
   "author": "SIOrbita",
   "license": "ISC",
   "type": "module",
-  "repository": "Siorbita/SioElement"
+  "repository": "Siorbita/SioElement",
+  "dependencies": {
+    "lit-html": "^3.2.1"
+  }
 }
