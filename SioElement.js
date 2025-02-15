@@ -135,7 +135,7 @@ class SioElement extends HTMLElement {
       const attributeName = this.constructor._getPropertyAttributeName(prop)
       if (this.hasAttribute(attributeName)) {
         // Initialize property from attribute value if present
-        this[prop] = this.getAttribute(attributeName)
+        this[prop] = this._cleanProperty(prop, this.getAttribute(attributeName))
       } else {
         if (this[prop] === undefined) {
           // Set default value if property is undefined
@@ -267,6 +267,9 @@ class SioElement extends HTMLElement {
   attributeChangedCallback(attributeName, oldValue, newValue) {
     const prop = this._getPropertyNameFromAttribute(attributeName)
     const propData = this.constructor.properties[prop]
+    if (propData.type === Boolean) {
+      newValue = newValue === null ? false : true
+    }
     if (!propData) return
     // Update the property value based on the new attribute value
     this[prop] = this._cleanProperty(prop, newValue)
